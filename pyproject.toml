@@ -11,8 +11,8 @@ authors = [
 keywords = []
 urls = {repository = "https://github.com/LouisDesdoigts/amigo"}
 dependencies = [
-  "jax", 
-  "jaxlib", 
+  "jax",
+  "jaxlib",
   "zodiax>=0.4.1",
   "dLux",
   "tqdm",
@@ -21,6 +21,7 @@ dependencies = [
   "matplotlib",
   "optimistix",
   "chainconsumer",
+  "pre-commit>=4.5.1",
 ]
 
 classifiers=[

@@ -1,9 +1,11 @@
 import os
-import zodiax as zdx
 import jax.numpy as np
 from jax import jit, grad, linearize, lax, vmap
 from .misc import tqdm
 import jax
+import equinox as eqx
+import jax.tree as jtu
+from jax import config
 
 
 def calc_fisher(
@@ -164,6 +166,13 @@ def hessian(f, x, has_aux=False, batch_size=1):
     return np.concatenate([hvp(batch) for batch in basis])
 
 
+def set_array(pytree, parameters):
+    dtype = np.float64 if config.x64_enabled else np.float32
+    floats, other = eqx.partition(pytree, eqx.is_inexact_array_like)
+    floats = jtu.map(lambda x: np.array(x, dtype=dtype), floats)
+    return eqx.combine(floats, other)
+
+
 def FIM(
     pytree,
     parameters,
@@ -175,7 +184,7 @@ def FIM(
     **loglike_kwargs,
 ):
     # Build X vec
-    pytree = zdx.tree.set_array(pytree, parameters)
+    pytree = set_array(pytree, parameters)
 
     if len(parameters) == 1:
         parameters = [parameters]

@@ -9,6 +9,24 @@ import dLux.utils as dlu
 from .misc import calc_throughput, interp
 from jax.lax import dynamic_update_slice, dynamic_slice
 from dLux.utils.propagation import transfer_matrix, calc_nfringes
+from jax.scipy.ndimage import map_coordinates
+
+
+def shift_opd(opd, shift_pix=np.zeros(2)):
+    # shift_pix = [dx, dy] in pixels.
+    yy, xx = np.indices(opd.shape)
+    dx, dy = shift_pix
+
+    # map_coordinates wants array coords in [row, col] = [y, x] order.
+    sample_coords = np.array([yy - dy, xx - dx])
+
+    return map_coordinates(
+        opd,
+        sample_coords,
+        order=1,
+        mode="constant",
+        cval=0.0,
+    )
 
 
 def gen_powers(degree):
@@ -430,6 +448,19 @@ class DynamicApertureMask(BaseApertureMask, dl.layers.optical_layers.OpticalLaye
         raise AttributeError(f"{self.__class__.__name__} has no attribute " f"{key}.")
 
 
+class RegisteredOPDLayer(dl.layers.optical_layers.OpticalLayer):
+    opd: Array
+    shift: Array
+
+    def __init__(self, opd, shift=np.zeros(2)):
+        self.opd = np.asarray(opd)
+        self.shift = np.asarray(shift, float)
+
+    def apply(self, wavefront):
+        shifted_opd = shift_opd(self.opd, self.shift)
+        return wavefront + shifted_opd
+
+
 class AMIOptics(dl.optical_systems.AngularOpticalSystem):
     filters: dict
     defocus_type: str
@@ -460,6 +491,8 @@ class AMIOptics(dl.optical_systems.AngularOpticalSystem):
         defocus=0.01,
         polike=False,
         static=True,
+        static_opd=None,
+        static_opd_shift=np.zeros(2),
     ):
         if defocus_type not in ["phase", "fft", None]:
             raise ValueError("defocus_type must be one of 'phase', 'fft', or None")
@@ -476,8 +509,11 @@ class AMIOptics(dl.optical_systems.AngularOpticalSystem):
 
         layers = []
 
-        # if static_opd:
-        #     layers += [("wfs_opd", dl.AberratedLayer(opd=np.zeros((1024, 1024))))]
+        if static_opd is not None:
+            if static_opd.shape != (wf_npixels, wf_npixels):
+                raise ValueError("static_opd must be of shape (wf_npixels, wf_npixels)")
+
+            layers += [("wfs_opd", RegisteredOPDLayer(static_opd, static_opd_shift))]
 
         layers += [("InvertY", dl.Flip(0))]
 

@@ -40,7 +40,18 @@ class AmigoModel(BaseModeller):
     ramp_model: None
     read: None
 
-    def __init__(self, exposures, optics, detector, ramp_model, read, state=None, vis_model=None):
+    def __init__(
+        self,
+        exposures,
+        optics,
+        detector,
+        ramp_model,
+        read,
+        state=None,
+        vis_model=None,
+        zero_aberrations_and_defocus=False,
+        set_aberrations_starting_points=None,
+    ):
         if state is not None:
             optics = optics.set("transmission", state["transmission"])
             detector = detector.set("jitter", state["jitter"])
@@ -64,14 +75,40 @@ class AmigoModel(BaseModeller):
                 params[param][key] = value
 
         if state is not None:
-            params["defocus"] = state["defocus"]
+            if zero_aberrations_and_defocus:
 
-            abb = {}
-            for key in params["aberrations"].keys():
-                prog, filt = key.split("_")
-                abb[key] = state["aberrations"][filt]
+                defo = {}
+                for filt in params["defocus"].keys():
+                    defo[filt] = np.zeros_like(state["defocus"][filt])
 
-            params["aberrations"] = abb  # jtu.map(lambda x: abb, params["aberrations"])
+                params["defocus"] = defo
+
+                abb = {}
+                for key in params["aberrations"].keys():
+                    prog, filt = key.split("_")
+                    abb[key] = np.zeros_like(state["aberrations"][filt])
+
+                params["aberrations"] = abb  # jtu.map(lambda x: abb, params["aberrations"])
+
+            elif set_aberrations_starting_points is not None:
+                params["defocus"] = state["defocus"]
+
+                abb = {}
+                for key in params["aberrations"].keys():
+                    prog, filt = key.split("_")
+                    abb[key] = set_aberrations_starting_points
+
+                params["aberrations"] = abb  # jtu.map(lambda x: abb, params["aberrations"])
+
+            else:
+                params["defocus"] = state["defocus"]
+
+                abb = {}
+                for key in params["aberrations"].keys():
+                    prog, filt = key.split("_")
+                    abb[key] = state["aberrations"][filt]
+
+                params["aberrations"] = abb  # jtu.map(lambda x: abb, params["aberrations"])
 
         # This seems to fix some recompile issues
         def fn(x):

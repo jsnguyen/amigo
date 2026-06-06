@@ -31,20 +31,20 @@ adam = lambda lr, start, *schedule: base_adam(scheduler(lr, start, *schedule))
 
 
 def debug_nan_check(grads):
-    bool_tree = jax.tree_map(lambda x: np.isnan(x).any(), grads)
+    bool_tree = jax.tree.map(lambda x: np.isnan(x).any(), grads)
     vals = np.array(jax.tree_util.tree_flatten(bool_tree)[0])
     eqx.debug.breakpoint_if(vals.sum() > 0)
     return grads
 
 
 def zero_nan_check(grads):
-    return jax.tree_map(lambda x: np.where(np.isnan(x), 0.0, x), grads)
+    return jax.tree.map(lambda x: np.where(np.isnan(x), 0.0, x), grads)
 
 
 def set_array(pytree, parameters):
     dtype = np.float64 if config.x64_enabled else np.float32
     floats, other = eqx.partition(pytree, eqx.is_inexact_array_like)
-    floats = jtu.tree_map(lambda x: np.array(x, dtype=dtype), floats)
+    floats = jtu.map(lambda x: np.array(x, dtype=dtype), floats)
     return eqx.combine(floats, other)
 
 

@@ -60,7 +60,7 @@ class Exposure(zdx.Base):
         #
         self.nints = file[0].header["NINTS"]
         self.filter = file[0].header["FILTER"]
-        self.star = file[0].header["TARGPROP"]
+        self.star = self._sanitize_key(file[0].header["TARGPROP"])
         self.observation = file[0].header["OBSERVTN"]
         self.program = file[0].header["PROGRAM"]
         self.act_id = file[0].header["ACT_ID"]
@@ -148,6 +148,9 @@ class Exposure(zdx.Base):
 
     def from_vec(self, vec, fill=np.nan):
         return (fill * np.ones((80, 80))).at[*self.support].set(vec)
+
+    def _sanitize_key(self, name: str) -> str:
+        return name.replace(".", "_").replace("-", "_")
 
 
 class ModelFit(Exposure):

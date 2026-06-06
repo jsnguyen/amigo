@@ -311,9 +311,10 @@ def analyse_vis(
 
     # Ruffio upper limits
     perc = jsp.stats.norm.cdf(n_sigma)
-    contrast_clipped = np.clip(contrast_im, 0, min_flux)  # clip to min_flux
-    ruffio_im = ruffio_upperlimit(contrast_clipped, sigma_im, perc)
-    # ruffio_im = ruffio_upperlimit(contrast_im, sigma_im, perc)
+    np.clip(contrast_im, 0, min_flux)  # clip to min_flux
+    # this is conservative according to dori
+    # ruffio_im = ruffio_upperlimit(contrast_clipped, sigma_im, perc)
+    ruffio_im = ruffio_upperlimit(contrast_im, sigma_im, perc)
 
     # Radial Ruffio upper limits
     avg_fn = lambda ruffio, **kwargs: azimuthalAverage(
@@ -434,11 +435,11 @@ def generate_photon_data(vis_eig_vals, n_terms, n_phot, cal_vis_dict, key=jr.key
 
 
 """
-Note the code below is a direct copy from the drpangloss repo. It has been placed here 
-becuase it is not a pip-installable package and therefore requires installing from 
+Note the code below is a direct copy from the drpangloss repo. It has been placed here
+becuase it is not a pip-installable package and therefore requires installing from
 source every time amigo is installed. Given it is a large package with notebooks
 directly inside of the repo, this can be quite slow and vulnerable to breaking if the
-code changes on the main branch. 
+code changes on the main branch.
 
 https://github.com/benjaminpope/drpangloss/blob/main/src/drpangloss/grid_fit.py#L269
 

@@ -18,6 +18,14 @@ class Ramp(dl.PSF):
     pass
 
 
+def _unsqueeze(x):
+    return x[None]
+
+
+def _relu(x):
+    return nn.relu(x)
+
+
 def model_ramp(psf, ngroups):
     """Applies an 'up the ramp' model of the input 'optical' PSF. Input PSF.data
     should have shape (npix, npix) and return shape (ngroups, npix, npix)"""
@@ -420,18 +428,19 @@ class PolyKernelModel(zdx.Base):
         kernels = np.array(jtu.leaves(get_spatial_kernels()))[:, None]
         spatial_encoder = Conv2d(in_channels=1, out_channels=16, key=subkey)
         spatial_encoder = eqx.tree_at(lambda conv: conv.weight, spatial_encoder, kernels)
-        layers = [eqx.nn.Lambda(lambda x: x[None]), spatial_encoder]
+        # layers = [eqx.nn.Lambda(lambda x: x[None]), spatial_encoder]
+        layers = [eqx.nn.Lambda(_unsqueeze), spatial_encoder]
         self.spatial_encoder = eqx.nn.Sequential(layers)
 
         # Convolution layers: Feature extraction from charge/bias distribution
         keys = jr.split(key, 3)
         layers = [
             Conv2d(in_channels=16, out_channels=16, key=keys[0]),
-            eqx.nn.Lambda(nn.relu),
+            eqx.nn.Lambda(_relu),
             Conv2d(in_channels=16, out_channels=16, key=keys[1]),
-            eqx.nn.Lambda(nn.relu),
+            eqx.nn.Lambda(_relu),
             Conv2d(in_channels=16, out_channels=16, key=keys[1]),
-            eqx.nn.Lambda(nn.relu),
+            eqx.nn.Lambda(_relu),
             Conv2d(in_channels=16, out_channels=n_features, key=keys[2]),
         ]
 
