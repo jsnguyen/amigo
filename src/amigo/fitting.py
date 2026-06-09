@@ -383,6 +383,21 @@ class Trainer(zdx.Base):
             args["key"] = jr.key(0)
         return args
 
+    def compile_funcs(self, optimisers):
+        """Build the optimiser and jitted loss/update functions once.
+
+        Pass the result to `train(..., funcs=...)` to reuse the same compiled
+        functions across multiple `train` calls (e.g. in a loop), so they are
+        only traced/compiled on the first call.
+        """
+        param_spec = ModelParams({p: p for p in optimisers.keys()})
+        optim = optax.multi_transform(optimisers, param_spec)
+
+        val_grad_fn = get_val_grad_fn(self.loss_fn)
+        loss_fn = get_norm_loss_fn(val_grad_fn, self.grad_fn)
+        update_fn = get_update_fn(optim, self.norm_fn)
+        return loss_fn, update_fn, optim
+
     def train(
         self,
         model,
@@ -390,6 +405,7 @@ class Trainer(zdx.Base):
         epochs,
         batches: dict,
         args={},
+        funcs=None,
     ):
         # Ensure args key exists and is the right type
         args = self.check_args_key(args)
@@ -401,14 +417,16 @@ class Trainer(zdx.Base):
         model_params = ModelParams({p: model.get(p) for p in optimisers.keys()})
         lrs = populate_lr_model(self.fishers, exposures, model_params)
 
-        # Get the optax optimiser and history bits
-        optim, state = get_optimiser(model_params, optimisers)
-        history = ParamHistory(model_params)
+        # Build (or reuse) the optimiser and jitted loss/update functions. Reusing
+        # the same objects across calls keeps the jit cache warm so we only
+        # compile once.
+        if funcs is None:
+            funcs = self.compile_funcs(optimisers)
+        loss_fn, update_fn, optim = funcs
 
-        # Get the loss and update functions
-        val_grad_fn = get_val_grad_fn(self.loss_fn)
-        loss_fn = get_norm_loss_fn(val_grad_fn, self.grad_fn)
-        update_fn = get_update_fn(optim, self.norm_fn)
+        # Init the optimiser state and history bits
+        state = optim.init(model_params)
+        history = ParamHistory(model_params)
 
         # Looping things
         t0 = time.time()
